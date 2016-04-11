@@ -153,7 +153,7 @@ StartReminding()
 	// Start reminding
 	ServerCommand("sm_csay [POVminder]: Don't forget to record POVs during official matches");
 	PrintToChatAll("[POVminder]: All players are required to record POVs during official matches");
-	PrintToChatAll("[POVminder]: Failure to record POVs could result in a 1 week suspension");
+	PrintToChatAll("[POVminder]: Failure to record POVs could result in a 1 week suspension and/or Match Overturn");
 	reminding = true;
 }
 
