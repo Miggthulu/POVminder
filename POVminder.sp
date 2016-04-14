@@ -26,8 +26,8 @@ public Plugin:myinfo =
 new bool:teamReadyState[2] = { false, false };
 new bool:RemindOnRestart = false;
 new bool:reminding = false;
-//new Handle:g_hPOVEnabled;	NOT YET FUNCTIONAL
-//new bool:g_bPOVEnabled;	NOT YET FUNCTIONAL  
+new Handle:g_hPOVEnabled;	//NOT YET FUNCTIONAL
+new bool:g_bPOVEnabled;	//NOT YET FUNCTIONAL  
 
 
 
@@ -53,20 +53,32 @@ public OnPluginStart()
 	// Hook into mp_tournament_restart
 	RegServerCmd("mp_tournament_restart", TournamentRestartHook);
 	
-	/** NOT YET FUNCTIONAL
-	g_hPOVEnabled = CreateConVar("sm_POVminder", "0", "Enable POVminder?(As if you'd want if off)\n0 = Disabled\n1 = Enabled", FCVAR_NONE, true, 0.0, true, 1.0);
-	g_bPOVEnabled = GetConVarBool(g_hCvarEnabled);
-	HookConVarChange(g_hCvarEnabled, OnConVarChange);
 	
-	RegAdminCmd("sm_reminder", RemindCmd, ADMFLAG_GENERIC, "Turns on POV Reminder");
-	**/
+	g_hPOVEnabled = CreateConVar("sm_POVminder", "0", "Enable POVminder?(As if you'd want if off)\n0 = Disabled\n1 = Enabled", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_bPOVEnabled = GetConVarBool(g_hPOVEnabled);
+	HookConVarChange(g_hPOVEnabled, OnConVarChange);
+	
+	//RegAdminCmd("sm_reminder", RemindCmd, ADMFLAG_GENERIC, "Turns on POV Reminder"); Non functional :(
+	
 }
 
 public OnConVarChange(Handle:convar, const String:oldValue[], const String:newValue[])
 {
 	if(convar == g_hPOVEnabled)
 		g_bPOVEnabled = bool:StringToInt(newValue);
+		
+	/* Non functional :(
+	if (!g_bPOVEnabled(1))
+    {
+        PrintToChatAll("[SM] POVMinder Enabled");
+    }
+    else
+    {
+        PrintToChatAll("[SM] POVMinder Disabled");
+    } 
+	*/
 }
+
 
 
 //------------------------------------------------------------------------------
@@ -98,13 +110,16 @@ public TeamStateEvent(Handle:event, const String:name[], bool:dontBroadcast)
 public GameRestartEvent(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	// Start reminding only if both team are in ready state
-	if (RemindOnRestart)
-	{
-		StartReminding();
-		RemindOnRestart = false;
-		teamReadyState[RED] = false;
-		teamReadyState[BLU] = false;
-	}
+		if (RemindOnRestart)
+		{
+			if (GetConVarBool(g_bPOVEnabled))
+			{
+				StartReminding();
+				RemindOnRestart = false;
+				teamReadyState[RED] = false;
+				teamReadyState[BLU] = false;
+			}
+		}
 }
 
 public GameOverEvent(Handle:event, const String:name[], bool:dontBroadcast)
@@ -153,12 +168,12 @@ public Action:CheckPlayers(Handle:timer)
 }
 
 //------------------------------------------------------------------------------
-// Commands (NOT YET FUNCTIONAL)
+// Commands
 //------------------------------------------------------------------------------
-/**
+/* Non functional :(
 public Action:RemindCmd(client, args)
 {
-	if(!g_bCvarEnabled || !IsValidClient(client))
+	if(!g_bPOVEnabled || !IsValidClient(client))
 		return Plugin_Continue;
 
 	if(args != 0 && args != 2)
@@ -167,7 +182,8 @@ public Action:RemindCmd(client, args)
 		return Plugin_Handled;
 	}
 }
-**/
+*/
+
 
 //------------------------------------------------------------------------------
 // Private functions
