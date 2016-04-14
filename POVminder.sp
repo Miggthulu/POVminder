@@ -26,12 +26,15 @@ public Plugin:myinfo =
 new bool:teamReadyState[2] = { false, false };
 new bool:RemindOnRestart = false;
 new bool:reminding = false;
+//new Handle:g_hPOVEnabled;	NOT YET FUNCTIONAL
+//new bool:g_bPOVEnabled;	NOT YET FUNCTIONAL  
 
 
 
 //------------------------------------------------------------------------------
 // Startup
 //------------------------------------------------------------------------------
+
 
 public OnPluginStart()
 {
@@ -49,8 +52,21 @@ public OnPluginStart()
 
 	// Hook into mp_tournament_restart
 	RegServerCmd("mp_tournament_restart", TournamentRestartHook);
+	
+	/** NOT YET FUNCTIONAL
+	g_hPOVEnabled = CreateConVar("sm_POVminder", "0", "Enable POVminder?(As if you'd want if off)\n0 = Disabled\n1 = Enabled", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_bPOVEnabled = GetConVarBool(g_hCvarEnabled);
+	HookConVarChange(g_hCvarEnabled, OnConVarChange);
+	
+	RegAdminCmd("sm_reminder", RemindCmd, ADMFLAG_GENERIC, "Turns on POV Reminder");
+	**/
 }
 
+public OnConVarChange(Handle:convar, const String:oldValue[], const String:newValue[])
+{
+	if(convar == g_hPOVEnabled)
+		g_bPOVEnabled = bool:StringToInt(newValue);
+}
 
 
 //------------------------------------------------------------------------------
@@ -135,6 +151,23 @@ public Action:CheckPlayers(Handle:timer)
 		Stopreminding();
 	}
 }
+
+//------------------------------------------------------------------------------
+// Commands (NOT YET FUNCTIONAL)
+//------------------------------------------------------------------------------
+/**
+public Action:RemindCmd(client, args)
+{
+	if(!g_bCvarEnabled || !IsValidClient(client))
+		return Plugin_Continue;
+
+	if(args != 0 && args != 2)
+	{
+		ReplyToCommand(client, "[SM] Usage: sm_reminder [0/1]");
+		return Plugin_Handled;
+	}
+}
+**/
 
 //------------------------------------------------------------------------------
 // Private functions
