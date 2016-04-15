@@ -1,11 +1,19 @@
 #pragma semicolon 1
 #include <sourcemod>
+#include <updater>
+#include <socket>
+
+#undef REQUIRE_PLUGIN
+#include <adminmenu>
 
 #define RED 0
 #define BLU 1
 #define TEAM_OFFSET 2
 
-#define PLUGIN_VERSION "1.0"
+#define PLUGIN_VERSION "1.2.2"
+
+#define MAX_URL_LENGTH 256
+#define UPDATE_URL "http://miggthulu.com/POVminder/updatefile.txt"
 
 
 public Plugin:myinfo =
@@ -17,7 +25,7 @@ public Plugin:myinfo =
 	url 		= "miggthulu.com"
 };
 
-//Credit should really go to Carbon as this is 98% his code: https://forums.alliedmods.net/showthread.php?t=92716
+//Lots of credit should go to Carbon as this is based heavily off of his code: https://forums.alliedmods.net/showthread.php?t=92716
 
 //------------------------------------------------------------------------------
 // Variables
@@ -26,8 +34,9 @@ public Plugin:myinfo =
 new bool:teamReadyState[2] = { false, false };
 new bool:RemindOnRestart = false;
 new bool:reminding = false;
-new Handle:g_hPOVEnabled;	//NOT YET FUNCTIONAL
-new bool:g_bPOVEnabled;	//NOT YET FUNCTIONAL  
+new Handle:g_hPOVEnabled;
+new bool:g_bPOVEnabled;
+new Handle:gH_AdminMenu = INVALID_HANDLE;
 
 
 
@@ -53,30 +62,80 @@ public OnPluginStart()
 	// Hook into mp_tournament_restart
 	RegServerCmd("mp_tournament_restart", TournamentRestartHook);
 	
+	CreateConVar("sm_pov_version", PLUGIN_VERSION, "POVminder version", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY|FCVAR_DONTRECORD);
+	
 	
 	g_hPOVEnabled = CreateConVar("sm_POVminder", "0", "Enable POVminder?(As if you'd want if off)\n0 = Disabled\n1 = Enabled", FCVAR_NONE, true, 0.0, true, 1.0);
 	g_bPOVEnabled = GetConVarBool(g_hPOVEnabled);
 	HookConVarChange(g_hPOVEnabled, OnConVarChange);
 	
-	//RegAdminCmd("sm_reminder", RemindCmd, ADMFLAG_GENERIC, "Turns on POV Reminder"); Non functional :(
+	RegAdminCmd("sm_reminder", RemindCmd, ADMFLAG_GENERIC, "Turns on POV Reminder");
+	
+	AutoExecConfig(true, "plugin.pov");
+	
+	new Handle:topmenu;
+	if(LibraryExists("adminmenu") && ((topmenu = GetAdminTopMenu()) != INVALID_HANDLE))
+	{
+		OnAdminMenuReady(topmenu);
+	}
 	
 }
 
 public OnConVarChange(Handle:convar, const String:oldValue[], const String:newValue[])
 {
 	if(convar == g_hPOVEnabled)
-		g_bPOVEnabled = bool:StringToInt(newValue);
+	{
+		SetConVarBool(g_hPOVEnabled, bool:StringToInt(newValue), true, false);
+		g_bPOVEnabled = GetConVarBool(g_hPOVEnabled);
+	}
 		
-	/* Non functional :(
-	if (!g_bPOVEnabled(1))
-    {
+	if(!g_bPOVEnabled)
+	{
+		PrintToChatAll("[SM] POVMinder Disabled");
+	}
+	else
+	{
         PrintToChatAll("[SM] POVMinder Enabled");
-    }
-    else
-    {
-        PrintToChatAll("[SM] POVMinder Disabled");
-    } 
-	*/
+	} 
+	
+}
+
+public OnLibraryRemoved(const String:name[])
+{
+	if(StrEqual(name, "adminmenu"))
+	{
+		gH_AdminMenu = INVALID_HANDLE;
+	}
+}
+
+public OnAdminMenuReady(Handle: topmenu)
+{	
+	new TopMenuObject:server_commands = FindTopMenuCategory(topmenu, ADMINMENU_SERVERCOMMANDS);
+	
+	if(server_commands == INVALID_TOPMENUOBJECT)
+		return;
+		
+	if(topmenu == gH_AdminMenu)
+	{
+		return;
+	}
+	
+	gH_AdminMenu = topmenu;
+	
+	AddToTopMenu(gH_AdminMenu, "sm_reminder", TopMenuObject_Item, AdminMenu_Reminder, server_commands, "sm_reminder", ADMFLAG_GENERIC);
+}
+
+public AdminMenu_Reminder(Handle:topmenu, TopMenuAction:action, TopMenuObject:object_id, param, String:buffer[], maxlength)
+{
+	if(action == TopMenuAction_DisplayOption)
+	{
+		FormatEx(buffer, maxlength, "Turn On/Off POV Reminders");
+	}
+	
+	else if(action == TopMenuAction_SelectOption)
+	{
+		SetConVarBool(g_hPOVEnabled, !GetConVarBool(g_hPOVEnabled), true, false);
+	}
 }
 
 
@@ -112,7 +171,7 @@ public GameRestartEvent(Handle:event, const String:name[], bool:dontBroadcast)
 	// Start reminding only if both team are in ready state
 		if (RemindOnRestart)
 		{
-			if (GetConVarBool(g_bPOVEnabled))
+			if (g_bPOVEnabled)
 			{
 				StartReminding();
 				RemindOnRestart = false;
@@ -170,19 +229,59 @@ public Action:CheckPlayers(Handle:timer)
 //------------------------------------------------------------------------------
 // Commands
 //------------------------------------------------------------------------------
-/* Non functional :(
 public Action:RemindCmd(client, args)
 {
-	if(!g_bPOVEnabled || !IsValidClient(client))
-		return Plugin_Continue;
-
-	if(args != 0 && args != 2)
+	//if(IsFakeClient(client) || !IsClientConnected(client))
+		//return Plugin_Handled;
+	
+	if(args > 1)
 	{
 		ReplyToCommand(client, "[SM] Usage: sm_reminder [0/1]");
 		return Plugin_Handled;
 	}
+	
+	if(args == 0)
+	{
+		SetConVarBool(g_hPOVEnabled, !GetConVarBool(g_hPOVEnabled), true, false);
+		g_bPOVEnabled = !g_bPOVEnabled;
+		return Plugin_Handled;
+	}
+	
+	new String:arg1[16];
+	GetCmdArg(1, arg1, 16);
+	new arg = StringToInt(arg1);
+	
+	if(arg > 1 || arg < 0)
+	{
+		ReplyToCommand(client, "[SM] Usage: sm_reminder [0/1]");
+		return Plugin_Handled;
+	}
+	
+	if(arg == 1)
+	{
+		if(GetConVarBool(g_hPOVEnabled))
+		{
+			ReplyToCommand(client, "[SM] Plugin is already Enabled.");
+			return Plugin_Handled;
+		}
+		
+		SetConVarBool(g_hPOVEnabled, bool:arg, true, false);
+	}
+	
+	else if(arg == 0)
+	{
+		if(!GetConVarBool(g_hPOVEnabled))
+		{
+			ReplyToCommand(client, "[SM] Plugin is already Disabled.");
+			return Plugin_Handled;
+		}
+		
+		SetConVarBool(g_hPOVEnabled, bool:arg, true, false);
+	}
+	
+	return Plugin_Handled;
 }
-*/
+
 
 
 //------------------------------------------------------------------------------
