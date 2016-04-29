@@ -38,6 +38,12 @@ new Handle:g_hPOVEnabled;
 new bool:g_bPOVEnabled;
 new Handle:gH_AdminMenu = INVALID_HANDLE;
 
+//Experimental Map&Config Loaders
+new Handle:g_h6sgully;
+new bool:g_b6sgully;
+new Handle:g_hHLgully;
+new bool:g_bHLgully;
+
 
 
 //------------------------------------------------------------------------------
@@ -79,6 +85,17 @@ public OnPluginStart()
 		OnAdminMenuReady(topmenu);
 	}
 	
+	//Experimental Map&Config Loaders+++++
+	
+	g_h6sgully = CreateConVar("6sgully", "0", "Load 6s Gullywash?(As if you'd want if off)\n0 = Disabled\n1 = Enabled", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_b6sgully = GetConVarBool(g_h6sgully);
+	HookConVarChange(g_h6sgully, OnConVarChange);
+	
+	g_hHLgully = CreateConVar("hlgully", "0", "Enable HL Gullywash?(As if you'd want if off)\n0 = Disabled\n1 = Enabled", FCVAR_NONE, true, 0.0, true, 1.0);
+	g_bHLgully = GetConVarBool(g_hHLgully);
+	HookConVarChange(g_hHLgully, OnConVarChange);
+	//Experimental Map&Config Loaders+++++
+	
 }
 
 public OnConVarChange(Handle:convar, const String:oldValue[], const String:newValue[])
@@ -98,6 +115,42 @@ public OnConVarChange(Handle:convar, const String:oldValue[], const String:newVa
         PrintToChatAll("[SM] POVMinder Enabled");
 	} 
 	
+	
+	if(convar == g_h6sgully)
+	{
+		SetConVarBool(g_h6sgully, bool:StringToInt(newValue), true, false);
+		g_b6sgully = GetConVarBool(g_h6sgully);
+	}
+		
+	if(!g_b6sgully)
+	{
+		PrintToChatAll("[SM] Loading Gullywash with 6s Config");
+		ServerCommand("exec ugc_6v_standard");
+		CreateTimer(1.5, LoadGully);
+
+	}
+	
+	if(convar == g_hHLgully)
+	{
+		SetConVarBool(g_hHLgully, bool:StringToInt(newValue), true, false);
+		g_bHLgully = GetConVarBool(g_hHLgully);
+	}
+		
+	if(!g_bHLgully)
+	{
+		PrintToChatAll("[SM] Loading Gullywash with HL Config");
+		ServerCommand("exec ugc_hl_standard");
+		CreateTimer(1.5, LoadGully);
+
+	}
+	
+	
+}
+
+public Action LoadGully(Handle timer)
+{
+	PrintToServer("Changing Map: CP_Gullywash");
+	ServerCommand("changelevel cp_gullywash");
 }
 
 public OnLibraryRemoved(const String:name[])
